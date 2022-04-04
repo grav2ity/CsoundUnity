@@ -37,32 +37,6 @@ using MYFLT = System.Single;
 
 #region PUBLIC_CLASSES
 
-[Serializable]
-[SerializeField]
-/// <summary>
-/// Utility class for controller and channels
-/// </summary>
-public class CsoundChannelController
-{
-    [SerializeField] public string type = "";
-    [SerializeField] public string channel = "";
-    [SerializeField] public string text = "";
-    [SerializeField] public string caption = "";
-    [SerializeField] public float min;
-    [SerializeField] public float max;
-    [SerializeField] public float value;
-    [SerializeField] public float skew;
-    [SerializeField] public float increment;
-    [SerializeField] public string[] options;
-
-    public void SetRange(float uMin, float uMax, float uValue)
-    {
-        min = uMin;
-        max = uMax;
-        value = uValue;
-    }
-}
-
 ///// <summary>
 ///// Utility class for CsoundFiles to copy 
 ///// </summary>
@@ -80,7 +54,7 @@ public class CsoundChannelController
 [AddComponentMenu("Audio/CsoundUnity")]
 [Serializable]
 [RequireComponent(typeof(AudioSource))]
-public class CsoundUnity : MonoBehaviour
+public class CsoundUnityPure : MonoBehaviour
 {
     #region PUBLIC_FIELDS
 
@@ -109,7 +83,7 @@ public class CsoundUnity : MonoBehaviour
     /// <summary>
     /// a string to hold all the csoundFile content
     /// </summary>
-    public string csoundString { get => _csoundString; set => _csoundString = value; }
+    public string csoundString { get => _csoundString; }
 
 #if UNITY_EDITOR
     /// <summary>
@@ -197,6 +171,7 @@ public class CsoundUnity : MonoBehaviour
     /// meaning other scripts cannot access it. If other scripts need to call any of Csounds native
     /// fuctions, then methods should be added to the CsoundUnity.cs file and CsoundUnityBridge class.
     /// </summary>
+    string dataPath;
     private CsoundUnityBridge csound;
     [SerializeField] private string _csoundFileGUID;
     [SerializeField] private string _csoundString;
@@ -238,51 +213,8 @@ public class CsoundUnity : MonoBehaviour
 
     #endregion
 
-    /// <summary>
-    /// CsoundUnity Awake function. Called when this script is first instantiated. This should never be called directly. 
-    /// This functions behaves in more or less the same way as a class constructor. When creating references to the
-    /// CsoundUnity object make sure to create them in the scripts Awake() function.
-    /// </summary>
-    void Awake()
+    public void ReDoCsound(string _csoundString)
     {
-        initialized = false;
-
-        AudioSettings.GetDSPBufferSize(out bufferSize, out numBuffers);
-
-        string dataPath = Path.GetFullPath(Path.Combine("Packages", packageName, "Runtime"));
-
-#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-        dataPath = Path.Combine(dataPath, "Win64"); // Csound plugin libraries in Windows Editor
-#elif UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
-        dataPath = Path.Combine(dataPath, "macOS");
-#elif UNITY_ANDROID
-        dataPath = Path.Combine(dataPath, "Android");
-#endif
-
-        //string path = System.Environment.GetEnvironmentVariable("Path");
-        //if (string.IsNullOrWhiteSpace(path) || !path.Contains(dataPath))
-        //{
-        //    string updatedPath = path + ";" + dataPath;
-        //    print("Updated path:" + updatedPath);
-        //    System.Environment.SetEnvironmentVariable("Path", updatedPath); // Is this needed for Csound to find libraries?
-        //}
-
-        audioSource = GetComponent<AudioSource>();
-        audioSource.spatializePostEffects = true;
-
-        // FIX SPATIALIZATION ISSUES
-        if (audioSource.clip == null && !processClipAudio)
-        {
-            var ac = AudioClip.Create("DummyClip", 32, 1, AudioSettings.outputSampleRate, false);
-            var data = new float[32];
-            for (var i = 0; i < data.Length; i++) data[i] = 1;
-            ac.SetData(data, 0);
-
-            audioSource.clip = ac;
-            audioSource.loop = true;
-            audioSource.Play();
-        }
-
         /// the CsoundUnityBridge constructor takes a path to the package Runtime folder, and a string with the csound code.
         /// It then calls createCsound() to create an instance of Csound and compile the csd string.
         /// After this we start the performance of Csound.
@@ -312,8 +244,8 @@ public class CsoundUnity : MonoBehaviour
                 }
             }
 
-            /// This coroutine prints the Csound output to the Unity console
-            LoggingCoroutine = StartCoroutine(Logging(.01f));
+            // /// This coroutine prints the Csound output to the Unity console
+            // LoggingCoroutine = StartCoroutine(Logging(.01f));
 
             compiledOk = csound.CompiledWithoutError();
 
@@ -344,8 +276,61 @@ public class CsoundUnity : MonoBehaviour
             Debug.Log("Error creating Csound object");
             compiledOk = false;
         }
+    }
+
+    /// <summary>
+    /// CsoundUnity Awake function. Called when this script is first instantiated. This should never be called directly. 
+    /// This functions behaves in more or less the same way as a class constructor. When creating references to the
+    /// CsoundUnity object make sure to create them in the scripts Awake() function.
+    /// </summary>
+    void Awake()
+    {
+        initialized = false;
+
+        AudioSettings.GetDSPBufferSize(out bufferSize, out numBuffers);
+
+        dataPath = Path.GetFullPath(Path.Combine("Packages", packageName, "Runtime"));
+
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+        dataPath = Path.Combine(dataPath, "Win64"); // Csound plugin libraries in Windows Editor
+#elif UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
+        dataPath = Path.Combine(dataPath, "macOS");
+#elif UNITY_ANDROID
+        dataPath = Path.Combine(dataPath, "Android");
+#endif
+
+        //string path = System.Environment.GetEnvironmentVariable("Path");
+        //if (string.IsNullOrWhiteSpace(path) || !path.Contains(dataPath))
+        //{
+        //    string updatedPath = path + ";" + dataPath;
+        //    print("Updated path:" + updatedPath);
+        //    System.Environment.SetEnvironmentVariable("Path", updatedPath); // Is this needed for Csound to find libraries?
+        //}
+
+
+        audioSource = GetComponent<AudioSource>();
+        audioSource.spatializePostEffects = true;
+
+        // FIX SPATIALIZATION ISSUES
+        if (audioSource.clip == null && !processClipAudio)
+        {
+            var ac = AudioClip.Create("DummyClip", 32, 1, AudioSettings.outputSampleRate, false);
+            var data = new float[32];
+            for (var i = 0; i < data.Length; i++) data[i] = 1;
+            ac.SetData(data, 0);
+
+            audioSource.clip = ac;
+            audioSource.loop = true;
+            audioSource.Play();
+        }
+
 
         Debug.Log("CsoundUnity done init, compiledOk? " + compiledOk);
+
+
+        //
+        initialized = true;
+
     }
 
 
@@ -1485,6 +1470,7 @@ public class CsoundUnity : MonoBehaviour
                         // multiply Csound output by the sample value to maintain spatialization set by Unity. 
                         // don't multiply if reading from a clip: this should maintain the spatialization of the clip anyway
                         samples[i + channel] = processClipAudio ? output : samples[i + channel] * output;
+                        // samples[i + channel] = output;
 
                         if (loudVolumeWarning && (samples[i + channel] > loudWarningThreshold))
                         {
